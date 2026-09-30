@@ -106,13 +106,45 @@ class Tensor{
             return shape_.size();
         }
 
-        //* FLATTENING a multi dimensional arrayz
-        //lets try it with this example 
-        //*shape = {3,2,5} -> 3 rank 
-        //*flat index vector would be like 
-// 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
-        //eg: we need to get flat index for the element at {1,1,2}
+        double& at(const std::vector<std::size_t>& idx)
+        {
+            return data_[flatIndex(idx)];
+        }
+        
         [[nodiscard]] double at(const std::vector<std::size_t>& idx) const //idx is the element coords in the matrix form
+        {
+            return data_[flatIndex(idx)];
+        }
+
+        [[nodiscard]] std::size_t dimension(const std::size_t axis) const 
+        {
+            if(axis>=rank())
+                throw std::out_of_range("Tensor axis is outside tensor's rank");
+            
+            return shape_[axis];
+        }
+
+        //! reduction methods
+
+        [[nodiscard]] double sum() const noexcept
+        {
+            //TODO : Return tensors
+            double result = 0.0;
+
+            for(const double val : data_)
+                result+=val; //* we don't worry about wrapping errors if result go out of bounds here bcz its floating point arithematic and not integer type
+                //*worse case scenario, result becomes very large and hence becomes infinity
+
+            return result;
+        }
+
+    private:
+        //! member variables
+        std::vector<std::size_t>shape_;
+        std::vector<double>data_;
+
+        //! member methods
+        [[nodiscard]] std::size_t flatIndex(const std::vector<std::size_t>& idx) const
         {
 
             if(idx.size()!=rank())
@@ -120,17 +152,15 @@ class Tensor{
                 throw std::invalid_argument("number of indices must match the rank of tensor");
             }
 
-            std::size_t flatIndex = 0; //start at 0
-            std::size_t stride=1; //let us start with one blocks for now
-
-            for(std::size_t axis =0; axis<rank(); axis++)
+            for(std::size_t axis = 0; axis<rank(); axis++)
             {
                 if(idx[axis]>=shape_[axis])
-                {
                     throw std::out_of_range("tensor index is outside its dimension");
-                }
             }
-            
+
+            std::size_t flatIndex = 0;
+            std::size_t stride = 1;
+
 
             for(std::size_t axis = rank(); axis>0; axis--)
             {
@@ -159,6 +189,13 @@ class Tensor{
                 stride*=shape_[currentAxis];
             }
 
+        //* FLATTENING a multi dimensional arrayz
+        //lets try it with this example 
+        //*shape = {3,2,5} -> 3 rank 
+        //*flat index vector would be like 
+        // 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+        //eg: we need to get flat index for the element at {1,1,2}
+
             //* 1st loop 
             // flatIndex = 0 + idx[2]*1 = 0+(2*1)=2
             // stride = 1*shape[2] = 1*5=5
@@ -168,22 +205,10 @@ class Tensor{
             //* 3rd loop
             // flatIndex = 7 + idx[0]*10 = 7+(1*10)=17
             // stride = 10*3 = 30
-
-            return data_[flatIndex];
-        }
-
-        [[nodiscard]] std::size_t dimension(const std::size_t axis) const 
-        {
-            if(axis>=rank())
-                throw std::out_of_range("Tensor axis is outside tensor's rank");
             
-            return shape_[axis];
-        }
+            return flatIndex;
 
-    private:
-        //! member variables
-        std::vector<std::size_t>shape_;
-        std::vector<double>data_;
+        }
 };
 
 int main()
@@ -238,9 +263,10 @@ int main()
     }
 
     assert(test5Threw);
-
-    std::cout<<"Test 6\n";
-    //* basic scalar check
+    }
+    
+    {std::cout<<"Test 6\n";
+        //* basic scalar check
     Tensor scalar(
         {},
         {5}
@@ -249,10 +275,12 @@ int main()
     assert(scalar.rank()==0);
     assert(scalar.numel()==1);
     assert(scalar.shape()==std::vector<std::size_t>{}); // the shape is indeed an empty vector as it has no dimensions so its a scalar with data = 5
+    assert(5==scalar.at({}));
+
     }
 
-    {std::cout<<"Test 6\n";
-    bool test6Threw = false;
+
+    {std::cout<<"Test 7\n";
     Tensor emptyMatrix(
         {1,0},
         {}
@@ -262,7 +290,7 @@ int main()
     assert(emptyMatrix.numel()==0);}
 
     
-    { std::cout<<"Test 7\n";
+    { std::cout<<"Test 8\n";
     bool test7Threw = false;
     try{
         Tensor t2(
@@ -278,14 +306,14 @@ int main()
     assert(test7Threw);
     }   
 
-    {std::cout<<"Test 8\n";
+    {std::cout<<"Test 9\n";
 
     //* to test the flat index fetch method
     double val = t.at({1,1});
     assert(val==4);}
 
 
-    {std::cout<<"Test 9\n";
+    {std::cout<<"Test 10\n";
     bool test9Threw = false;
     //* to test the flat index fetch method guards#1 i.e rank mismatch
     try{
@@ -302,7 +330,7 @@ int main()
     assert(test9Threw);}
 
 
-    {std::cout<<"Test 10\n";
+    {std::cout<<"Test 11\n";
     bool test10Threw = false;
     //* to test the flat index fetch method guards#2 i.e out of dimension indices
     try{
@@ -312,13 +340,13 @@ int main()
         );
         double val = t2.at({4,5});
     } catch(std::out_of_range& error){
-        if(std::string(error.what())=="tensor index is outside its dimension");
+        if(std::string(error.what())=="tensor index is outside its dimension")
             test10Threw = true;
     }
 
     assert(test10Threw);}
 
-    {std::cout<<"Test 11\n";
+    {std::cout<<"Test 12\n";
         bool test11Threw = false;
     //* to test whether size_t overflows check work
     try{
@@ -332,7 +360,7 @@ int main()
     }
     assert(test11Threw);}
 
-    {std::cout<<"Test 12\n";
+    {std::cout<<"Test 13\n";
 
         Tensor overflowAndZero({std::numeric_limits<std::size_t>::max(),0},{});
 
@@ -340,7 +368,7 @@ int main()
         assert(overflowAndZero.numel()==0);
     }
 
-    {std::cout<<"Test 13\n";
+    {std::cout<<"Test 14\n";
 
         Tensor _3dOverflow({std::numeric_limits<std::size_t>::max(),2,0},{});
 
@@ -348,7 +376,7 @@ int main()
         assert(_3dOverflow.numel()==0);
     }
 
-    {std::cout<<"Test 14\n";
+    {std::cout<<"Test 15\n";
         //* to test the dimension method
         Tensor dimTest({2,0,3},{});
         assert(dimTest.dimension(0)==2);
@@ -367,7 +395,28 @@ int main()
 
         assert(rejectedAxis);
     }
+    
+    //* mutation tests
+    {std::cout<<"Test 16\n";
+        //* to test if our tensors can be modified properly or not
+        Tensor mutableTensor({2,3},{0,1,2,3,4,5});
+        assert(mutableTensor.at({1,1})==4);
+        mutableTensor.at({1,1})=5;
+        assert(mutableTensor.at({1,1})==5);
+    }
+    
+    //* reduction tests
+    {std::cout<<"Test 17\n";
+        //* to check basic reduction sum method
 
+        assert(Tensor({2,3},{1,2,3,4,5,6}).sum()==21.0);
+        assert(Tensor({},{6}).sum()==6.0);
+        assert(Tensor({1},{8}).sum()==8.0);
+        assert(Tensor({0},{}).sum()==0.0);
+        assert(Tensor({2,0,3},{}).sum()==0.0);
+    }
+    
+    
     std::cout<<"Success!";
 
     
